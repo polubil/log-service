@@ -1,17 +1,17 @@
 import asyncio
 import csv
-from datetime import datetime
-from io import TextIOWrapper
-from httpx import AsyncClient, ConnectError
-import os
 import fcntl
+import os
+from datetime import datetime
+
+from httpx import AsyncClient, ConnectError
 
 
-"""
-Идея заключается в том, что когда в csv записываем новые данные, они упорядочены по возрастанию даты.
-Нам нужна первая строка, поэтому читаем файл с конца и забираем первую (с конца) строку.
-"""
 def reverse_readlines(fd: int, buf_size: int = 4096, encoding: str = "utf-8"):
+    """
+    Идея заключается в том, что когда в csv записываем новые данные, они упорядочены по возрастанию даты.
+    Нам нужна первая строка, поэтому читаем файл с конца и забираем первую (с конца) строку.
+    """
     with open(fd, "rb") as f:
         f.seek(0, os.SEEK_END)
         position = f.tell()
@@ -29,17 +29,16 @@ def reverse_readlines(fd: int, buf_size: int = 4096, encoding: str = "utf-8"):
         if trailing:
             yield trailing.decode(encoding)
 
-async def fetch_data(client: AsyncClient, gt_date: datetime | None, retries: int = 3):
+
+async def fetch_data(client: AsyncClient, gt_date: datetime | None, limit: int = 100, retries: int = 3):
     try:
-        data = await client.get("/api/data", params={
-            "gt": gt_date
-        } if gt_date else {})
-        print(data)
+        data = await client.get("/api/data", params={"gt": gt_date, "limit": limit} if gt_date else {})
         return data.json()
     except ConnectError as e:
         if retries > 0:
-            await asyncio.sleep((4-retries)**2)
-            return await fetch_data(client, gt_date, retries-1)
+            await asyncio.sleep((4 - retries) ** 2)
+            return await fetch_data(client, gt_date, retries - 1)
+
 
 def get_last_date(filename: str) -> datetime | None:
     header = ["id", "created", "ip", "method", "uri", "status_code"]
@@ -50,24 +49,39 @@ def get_last_date(filename: str) -> datetime | None:
             writer = csv.writer(f)
             writer.writerow(header)
             return None
-    
+
     last_row = next(reverse_readlines(filename))
     r = csv.reader([last_row])
     return list(r)[0][1]
+
 
 def write_new_data(filename: str, data: list[dict]):
     with open(filename, "a", encoding="UTF-8") as f:
         for d in data:
             log = d["log"]
             writer = csv.writer(f, quoting=csv.QUOTE_ALL)
-            writer.writerow([d["id"], d["created"], log["ip"], log["method"], log["uri"], log["status_code"]])
+            writer.writerow(
+                [
+                    d["id"],
+                    d["created"],
+                    log["ip"],
+                    log["method"],
+                    log["uri"],
+                    log["status_code"],
+                ]
+            )
+
 
 async def start():
-    delay_s = 5.0 # from env
-    http_client = AsyncClient(base_url="http://api:8000") # from env
-    limit = int(os.environ.get("limit", 100))
+    base_url = os.environ.get("BASE_URL", "http://api:8000")
+    delay_s = int(os.environ.get("REQUESTS_DELAY_S", 10))
+    limit = int(os.environ.get("REQUEST_MAX_ROWS", 100))
+    data_filename = os.environ.get("DATA_FILENAME", "data")
+
+    http_client = AsyncClient(base_url=base_url)
+
     basedir = "data/"
-    filename = "data.csv" # from env
+    filename = f"{data_filename}.csv"
     lockfile = "data.lock"
 
     if not os.path.exists(basedir):
@@ -91,8 +105,10 @@ async def start():
 
         await asyncio.sleep(delay_s)
 
+
 def main():
     asyncio.run(start())
+
 
 if __name__ == "__main__":
     main()

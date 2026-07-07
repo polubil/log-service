@@ -8,7 +8,7 @@ services:
     networks:
       - svc
     depends_on:
-      db: 
+      db:
         condition: service_healthy
     env_file:
       - .env.dev
@@ -35,7 +35,7 @@ services:
       context: client
       target: client
     depends_on:
-      api: 
+      api:
         condition: service_healthy
     networks:
       - svc
@@ -45,7 +45,7 @@ services:
   worker:
     build: worker
     depends_on:
-      api: 
+      api:
         condition: service_healthy
     networks:
       - svc
@@ -54,6 +54,8 @@ services:
     volumes:
       - ./worker/data:/app/data
     working_dir: /app
+    deploy:
+      replicas: 3
 
   db:
     image: postgres:latest
