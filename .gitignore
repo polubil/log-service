@@ -1,0 +1,8 @@
+__pycache__/
+.env
+.env*
+VERSION
+.venv
+.win_venv
+.csv
+data.lock
