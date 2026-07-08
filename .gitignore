@@ -1,6 +1,6 @@
 __pycache__/
 .env
-.env*
+.env.dev
 VERSION
 .venv
 .win_venv

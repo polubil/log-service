@@ -1,4 +1,4 @@
-FROM ubuntu:noble AS client
+FROM ubuntu:noble
 
 ARG python_version=3.14
 

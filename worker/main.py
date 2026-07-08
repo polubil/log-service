@@ -30,9 +30,9 @@ def reverse_readlines(fd: int, buf_size: int = 4096, encoding: str = "utf-8"):
             yield trailing.decode(encoding)
 
 
-async def fetch_data(client: AsyncClient, gt_date: datetime | None, limit: int = 100, retries: int = 3):
+async def fetch_data(client: AsyncClient, url: str, gt_date: datetime | None, limit: int = 100, retries: int = 3):
     try:
-        data = await client.get("/api/data", params={"gt": gt_date, "limit": limit} if gt_date else {})
+        data = await client.get(url, params={"gt": gt_date, "limit": limit} if gt_date else {})
         return data.json()
     except ConnectError as e:
         if retries > 0:
@@ -73,12 +73,13 @@ def write_new_data(filename: str, data: list[dict]):
 
 
 async def start():
-    base_url = os.environ.get("BASE_URL", "http://api:8000")
-    delay_s = int(os.environ.get("REQUESTS_DELAY_S", 10))
-    limit = int(os.environ.get("REQUEST_MAX_ROWS", 100))
-    data_filename = os.environ.get("DATA_FILENAME", "data")
+    url = os.environ.get("WORKER_REQUESTS_URL", "http://api:8000/api/data")
+    delay_s = int(os.environ.get("WORKER_REQUESTS_DELAY_S", 10))
+    limit = int(os.environ.get("WORKER_REQUESTS_MAX_ROWS", 100))
+    data_filename = os.environ.get("WORKER_DATA_FILENAME", "data")
+    http_timeout = int(os.environ.get("WORKER_HTTP_TIMEOUT", 2))
 
-    http_client = AsyncClient(base_url=base_url)
+    http_client = AsyncClient(timeout=http_timeout)
 
     basedir = "data/"
     filename = f"{data_filename}.csv"
@@ -97,7 +98,7 @@ async def start():
             fcntl.flock(f, fcntl.LOCK_EX)
 
             gt_date = get_last_date(path_to_file)
-            data = await fetch_data(client=http_client, gt_date=gt_date, limit=limit)
+            data = await fetch_data(client=http_client, url=url, gt_date=gt_date, limit=limit)
             write_new_data(path_to_file, data)
             print(data)
 

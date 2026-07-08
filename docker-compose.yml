@@ -1,8 +1,6 @@
 services:
   api:
-    build:
-      context: api
-      target: webapi
+    build: api
     ports:
       - "8000:8000"
     networks:
@@ -11,40 +9,53 @@ services:
       db: 
         condition: service_healthy
     env_file:
-      - .env.dev
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    restart: unless-stopped
 
   client:
-    build:
-      context: client
-      target: client
+    build: client
     depends_on:
       api: 
         condition: service_healthy
     networks:
       - svc
     env_file:
-      - .env.dev
+      - .env
+
+  worker:
+    build: worker
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - svc
+    env_file:
+      - .env
+    volumes:
+      - ./worker/data:/app/data
+    working_dir: /app
+    deploy:
+      replicas: 1
 
   db:
     image: postgres:latest
-    container_name: db_container_mtech
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: postgres_user
-      POSTGRES_PASSWORD: postgres_password
-      POSTGRES_DB: postgres_db
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data/pgdata
-    deploy:
-      resources:
-        limits:
-          cpus: "0.50"
-          memory: 512M
-        reservations:
-          cpus: "0.25"
-          memory: 256M
     command: >
       postgres -c max_connections=1000
                -c shared_buffers=256MB
@@ -66,6 +77,8 @@ services:
 
 volumes:
   pgdata:
+    driver: local
+  worker:
     driver: local
 
 networks:
