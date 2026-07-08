@@ -16,7 +16,12 @@ cp .env.example .env
 docker compose build
 docker compose up --scale worker=3
 ```
-
+или 
+```
+cp .env.example .env.dev
+docker compose -f docker-compose.dev.yml build
+docker compose  --env-file=.env.dev -f docker-compose.dev.yml up
+```
 В compose запустится 3 сервиса:
 [Web API](api/README.md)
 [Client](client/README.md)

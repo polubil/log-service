@@ -57,7 +57,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: postgres:latest
+    image: postgres:18.0
     env_file:
       - .env.dev
     environment:

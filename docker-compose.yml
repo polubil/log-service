@@ -27,6 +27,7 @@ services:
       - svc
     env_file:
       - .env
+    restart: unless-stopped
 
   worker:
     build: worker
@@ -38,13 +39,14 @@ services:
     env_file:
       - .env
     volumes:
-      - ./worker/data:/app/data
+      - worker:/app/data
     working_dir: /app
     deploy:
       replicas: 1
+    restart: unless-stopped
 
   db:
-    image: postgres:latest
+    image: postgres:18.0
     env_file:
       - .env
     environment:
