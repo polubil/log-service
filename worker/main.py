@@ -55,7 +55,7 @@ def get_last_date(filename: str) -> datetime | None:
     exists = os.path.exists(filename)
     if not exists:
         with open(filename, "x", encoding="UTF-8") as f:
-            writer = csv.writer(f)
+            writer = csv.writer(f, quoting=csv.QUOTE_ALL)
             writer.writerow(header)
             return None
 
