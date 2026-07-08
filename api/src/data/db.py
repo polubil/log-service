@@ -103,4 +103,4 @@ class DB:
 
         async with self.pool.acquire() as p:
             res = await p.fetch(query, *params)
-            return dict(res)
+            return list(res)
