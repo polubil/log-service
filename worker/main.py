@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from typing import Generator
 
-from httpx import AsyncClient, ConnectError
+from httpx import AsyncClient, ConnectError, ConnectTimeout, ReadTimeout
 
 
 def reverse_readlines(fd: int, buf_size: int = 4096, encoding: str = "utf-8") -> Generator[str]:
@@ -34,23 +34,25 @@ def reverse_readlines(fd: int, buf_size: int = 4096, encoding: str = "utf-8") ->
 async def fetch_data(
     client: AsyncClient, 
     url: str, 
-    gt_date: datetime | None, 
+    gt_date: str | None, 
     limit: int = 100, 
-    retries: int = 3) -> list[dict[str]]:
+    retries: int = 3) -> list[dict[str]] | None:
     try:
         params = {"limit": limit}
         if gt_date:
             params["gt"] = gt_date
-        data = await client.get(url, params=params)
-        return data.json()
-    except ConnectError as e:
+        response = await client.get(url, params=params)
+        if response.status_code == 200:
+            return response.json()
+        return []
+    except (ConnectError, ConnectTimeout, ReadTimeout) as e:
         if retries > 0:
             await asyncio.sleep((4 - retries) ** 2)
             return await fetch_data(client, url, gt_date, limit, retries - 1)
         return []
 
 
-def get_last_date(filename: str) -> datetime | None:
+def get_last_date(filename: str) -> str | None:
     header = ["id", "created", "ip", "method", "uri", "status_code"]
     exists = os.path.exists(filename)
     if not exists:
@@ -61,7 +63,13 @@ def get_last_date(filename: str) -> datetime | None:
 
     last_row = next(reverse_readlines(filename))
     r = csv.reader([last_row])
-    return list(r)[0][1]
+
+    last_date = list(r)[0][1]
+    try:
+        datetime.fromisoformat(last_date)
+        return last_date
+    except (TypeError, ValueError):
+        return None
 
 
 def write_new_data(filename: str, data: list[dict]):

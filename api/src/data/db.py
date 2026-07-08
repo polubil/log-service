@@ -21,11 +21,11 @@ class DB:
                 """
                 CREATE TABLE IF NOT EXISTS logs(
                     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                    ip inet,
-                    method VARCHAR(7),
-                    uri VARCHAR(512),
-                    status_code INTEGER CHECK (status_code BETWEEN 100 AND 599),
-                    created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ip inet NOT NULL,
+                    method VARCHAR(7) NOT NULL,
+                    uri VARCHAR(512) NOT NULL,
+                    status_code INTEGER CHECK (status_code BETWEEN 100 AND 599) NOT NULL,
+                    created TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
                 )
                 """
             )

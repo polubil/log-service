@@ -4,5 +4,6 @@ __pycache__/
 VERSION
 .venv
 .win_venv
-.csv
+*.csv
 data.lock
+*.log
