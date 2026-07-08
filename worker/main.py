@@ -92,16 +92,16 @@ async def start():
     
     try:
         limit = int(os.environ.get("WORKER_REQUESTS_MAX_ROWS", 100))
-    except ValueError as e:
         if limit < 1:
             raise ValueError()
+    except ValueError as e:
         raise ValueError("WORKER_REQUESTS_MAX_ROWS must be positive int") from e
 
     try:
         http_timeout = int(os.environ.get("WORKER_HTTP_TIMEOUT", 2))
-    except ValueError as e:
         if http_timeout < 1:
             raise ValueError()
+    except ValueError as e:
         raise ValueError("WORKER_HTTP_TIMEOUT must be positive int") from e
 
     data_filename = os.environ.get("WORKER_DATA_FILENAME", "data")
@@ -119,7 +119,10 @@ async def start():
     path_to_lock = os.path.join(basedir, lockfile)
 
     if not os.path.exists(path_to_lock):
-        os.mknod(path_to_lock)
+        try:
+            os.mknod(path_to_lock)
+        except FileExistsError:
+            pass
     while 1:
         with open(path_to_lock) as f:
             fcntl.flock(f, fcntl.LOCK_EX)
