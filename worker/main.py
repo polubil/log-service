@@ -3,11 +3,12 @@ import csv
 import fcntl
 import os
 from datetime import datetime
+from typing import Generator
 
 from httpx import AsyncClient, ConnectError
 
 
-def reverse_readlines(fd: int, buf_size: int = 4096, encoding: str = "utf-8"):
+def reverse_readlines(fd: int, buf_size: int = 4096, encoding: str = "utf-8") -> Generator[str]:
     """
     Идея заключается в том, что когда в csv записываем новые данные, они упорядочены по возрастанию даты.
     Нам нужна первая строка, поэтому читаем файл с конца и забираем первую (с конца) строку.
@@ -30,20 +31,28 @@ def reverse_readlines(fd: int, buf_size: int = 4096, encoding: str = "utf-8"):
             yield trailing.decode(encoding)
 
 
-async def fetch_data(client: AsyncClient, url: str, gt_date: datetime | None, limit: int = 100, retries: int = 3):
+async def fetch_data(
+    client: AsyncClient, 
+    url: str, 
+    gt_date: datetime | None, 
+    limit: int = 100, 
+    retries: int = 3) -> list[dict[str]]:
     try:
-        data = await client.get(url, params={"gt": gt_date, "limit": limit} if gt_date else {})
+        params = {"limit": limit}
+        if gt_date:
+            params["gt"] = gt_date
+        data = await client.get(url, params=params)
         return data.json()
     except ConnectError as e:
         if retries > 0:
             await asyncio.sleep((4 - retries) ** 2)
-            return await fetch_data(client, gt_date, retries - 1)
+            return await fetch_data(client, url, gt_date, limit, retries - 1)
+        return []
 
 
 def get_last_date(filename: str) -> datetime | None:
     header = ["id", "created", "ip", "method", "uri", "status_code"]
     exists = os.path.exists(filename)
-    print(exists)
     if not exists:
         with open(filename, "x", encoding="UTF-8") as f:
             writer = csv.writer(f)
@@ -74,10 +83,28 @@ def write_new_data(filename: str, data: list[dict]):
 
 async def start():
     url = os.environ.get("WORKER_REQUESTS_URL", "http://api:8000/api/data")
-    delay_s = int(os.environ.get("WORKER_REQUESTS_DELAY_S", 10))
-    limit = int(os.environ.get("WORKER_REQUESTS_MAX_ROWS", 100))
+    try:
+        delay_s = int(os.environ.get("WORKER_REQUESTS_DELAY_S", 10))
+        if delay_s < 1:
+            raise ValueError()
+    except ValueError as e:
+        raise ValueError("WORKER_REQUESTS_DELAY_S must be positive int") from e
+    
+    try:
+        limit = int(os.environ.get("WORKER_REQUESTS_MAX_ROWS", 100))
+    except ValueError as e:
+        if limit < 1:
+            raise ValueError()
+        raise ValueError("WORKER_REQUESTS_MAX_ROWS must be positive int") from e
+
+    try:
+        http_timeout = int(os.environ.get("WORKER_HTTP_TIMEOUT", 2))
+    except ValueError as e:
+        if http_timeout < 1:
+            raise ValueError()
+        raise ValueError("WORKER_HTTP_TIMEOUT must be positive int") from e
+
     data_filename = os.environ.get("WORKER_DATA_FILENAME", "data")
-    http_timeout = int(os.environ.get("WORKER_HTTP_TIMEOUT", 2))
 
     http_client = AsyncClient(timeout=http_timeout)
 
@@ -100,7 +127,6 @@ async def start():
             gt_date = get_last_date(path_to_file)
             data = await fetch_data(client=http_client, url=url, gt_date=gt_date, limit=limit)
             write_new_data(path_to_file, data)
-            print(data)
 
             fcntl.flock(f, fcntl.LOCK_UN)
 

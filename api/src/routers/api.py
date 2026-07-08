@@ -13,12 +13,14 @@ def get_db(request: Request) -> DB:
 
 
 def parse_log_line(raw: str) -> Log:
-    parts = raw.split(" ")
+    parts = raw.split()
     if len(parts) != 4:
         raise ValueError("Incorrect data format.")
     ip, method, uri, status_code = parts
     if not uri.startswith("/"):
         raise ValueError("Incorrect Uri format")
+    if int(status_code) < 100 or int(status_code) > 599:
+        raise ValueError("Incorrect Status Code")
     return Log(ip=ip, method=method, uri=uri, status_code=status_code)
 
 
@@ -70,8 +72,14 @@ async def stats(
     gt: datetime | None = None,
     db: Annotated[DB, Depends(get_db)] = Depends(get_db),
 ) -> AggregationResult:
-    methods = await db.get_stats("method", lt, gt)
-    status_codes = await db.get_stats("status_code", lt, gt)
+    rows = await db.get_stats(lt, gt)
+    methods = {}
+    status_codes = {}
+    for r in rows:
+        if r["method"]:
+            methods[r["method"]] = r.get("count")
+        if r["status_code"]:
+            status_codes[r["status_code"]] = r.get("count") 
     return AggregationResult(methods=methods, status_codes=status_codes)
 
 @router.get("/health")

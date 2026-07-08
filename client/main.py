@@ -1,6 +1,6 @@
 import os
 import signal
-from httpx import Client, ConnectError
+from httpx import Client, ConnectError, ConnectTimeout, ReadTimeout
 
 from logging import INFO
 import random
@@ -12,15 +12,16 @@ from src.string_gen import gen_string
 def make_requests(client: Client, url: str, max_delay_ms: int, stop: threading.Event):
     while not stop.is_set():
         payload = gen_string()
-
+        r = None
         try:
             r = client.post(url=url, json={"log": payload})
-        except ConnectError as e: 
+        except (ConnectError, ConnectTimeout, ReadTimeout) as e: 
             stop.wait(2)
         finally:
+            status_code = r.status_code if r and r.status_code else -1
             logger.log(
                 INFO,
-                f'{threading.current_thread().name} "{payload}" {r.status_code}',
+                f'{threading.current_thread().name} "{payload}" {status_code}',
             )
 
             stop.wait(random.uniform(0, max_delay_ms) / 1000)

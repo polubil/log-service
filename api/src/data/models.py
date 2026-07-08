@@ -31,5 +31,5 @@ class LogRequest(BaseModel):
     log: str
 
 class AggregationResult(BaseModel):
-    method: dict[Method, int] | None = None
+    methods: dict[Method, int] | None = None
     status_codes: dict[int, int] | None = None

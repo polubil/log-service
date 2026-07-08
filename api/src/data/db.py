@@ -32,6 +32,12 @@ class DB:
             await p.execute(
                 "CREATE INDEX IF NOT EXISTS idx_logs_created_id ON logs (created, id)"
             )
+            await p.execute(
+                "CREATE INDEX IF NOT EXISTS idx_logs_method ON logs (method)"
+            )
+            await p.execute(
+                "CREATE INDEX IF NOT EXISTS idx_logs_status_code ON logs (status_code)"
+            )
 
     async def insert(self, log: Log):
         query = (
@@ -68,19 +74,21 @@ class DB:
             params.append(gt)
             query += f" AND created > ${len(params)}"
 
+        query += f" ORDER BY created"
+
         params.append(limit)
         query += f" LIMIT ${len(params)}"
 
         params.append(offset)
         query += f" OFFSET ${len(params)}"
-        print(query)
+
         async with self.pool.acquire() as p:
             logs = await p.fetch(query, *params)
             return [Log(**log) for log in logs]
 
-    async def get_stats(self, agg_by, lt, gt):
+    async def get_stats(self, lt, gt):
 
-        query = f"SELECT {agg_by}, COUNT(*) FROM logs WHERE 1=1"
+        query = f"SELECT method, status_code, COUNT(*) FROM logs WHERE 1=1"
 
         params = []
         if lt is not None:
@@ -91,8 +99,7 @@ class DB:
             params.append(gt)
             query += f" AND created > ${len(params)}"
 
-        query += f" GROUP BY {agg_by} ORDER BY COUNT(*) DESC"
-        print(query)
+        query += f" GROUP BY GROUPING SETS ( (method), (status_code) ) ORDER BY COUNT(*) DESC"
 
         async with self.pool.acquire() as p:
             res = await p.fetch(query, *params)

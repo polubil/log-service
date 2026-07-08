@@ -1,10 +1,20 @@
 # MTech Logging Services
+#### Используемые технологии:
+python 3.14
+uv
+httpx
+fastapi
+asyncpg
+pydantic
+pydantic-settings
+docker-compose
+
 ## Quick Start
 
 ```
 cp .env.example .env
 docker compose build
-docker compose up
+docker compose up --scale worker=3
 ```
 
 В compose запустится 3 сервиса:
@@ -30,4 +40,4 @@ Python 3.14, FastAPI, Pydantic, Pydantic-settings, PostgreSQL (asyncpg)
 Сервис генерирует строки формата ```{IP адрес} {HTTP method} {URI} {HTTP status code}``` и отправляет их в Web API сервис через POST-запросы.
 
 ## Worker (сервис фоновой обработки) [Worker](worker/README.md)
-Сервис периодически (каждые ```REQUESTS_DELAY_S``` секунд) выполняет GET-запросы к Web API сервису и сохраняет полученные данные в csv файл, примонтированный как Docker Volume.
+Сервис периодически (каждые ```WORKER_REQUESTS_DELAY_S``` секунд) выполняет GET-запросы к Web API сервису и сохраняет полученные данные в csv файл, примонтированный как Docker Volume.
